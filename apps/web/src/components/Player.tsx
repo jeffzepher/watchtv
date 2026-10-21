@@ -19,11 +19,11 @@ export default function Player({video,line,episode,proxy,initialTime,onEpisode,o
   const ready=()=>{if(initialTime>0&&Number.isFinite(el.duration))el.currentTime=Math.min(initialTime,Math.max(0,el.duration-2));el.playbackRate=speed;void startPlayback(el);};
   el.addEventListener('loadedmetadata',ready);el.addEventListener('error',mediaError);
   if(/\.m3u8(?:\?|$)/i.test(current.url)||useProxy&&/m3u8/i.test(current.url)){
-   if(el.canPlayType('application/vnd.apple.mpegurl'))el.src=src;
-   else if(Hls.isSupported()){
+   if(Hls.isSupported()){
     hls=new Hls({maxBufferLength:30,maxMaxBufferLength:60});hls.loadSource(src);hls.attachMedia(el);
     hls.on(Hls.Events.ERROR,(_event,data)=>{if(data.fatal)fail(data.response?.code,typeof data.response?.data==='string'?data.response.data:'');});
-   }else setError('当前浏览器不支持 HLS，请使用新版浏览器');
+   }else if(el.canPlayType('application/vnd.apple.mpegurl'))el.src=src;
+   else setError('当前浏览器不支持 HLS，请使用新版浏览器');
   }else el.src=src;
   const persist=()=>{
    if(!Number.isFinite(el.currentTime)||el.currentTime<=0)return;
