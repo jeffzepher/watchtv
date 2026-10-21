@@ -14,19 +14,49 @@ export function isPublicAddress(address: string): boolean {
 type Answer = {address: string; family: number};
 type Resolver = (host: string) => Promise<Answer[]>;
 const dnsCache=new Map<string,{expires:number;answers:Answer[]}>();
-async function resolveHostname(host:string,signal?:AbortSignal):Promise<Answer[]>{
-  if(process.env.WATCHTV_PUBLIC_DNS!=='cloudflare')return lookup(host,{all:true});
-  const cached=dnsCache.get(host);if(cached&&cached.expires>Date.now())return cached.answers;
-  const url=new URL('https://cloudflare-dns.com/dns-query');url.searchParams.set('name',host);url.searchParams.set('type','A');
+function checkedAnswers(answers:Answer[]):Answer[]{
+  if(!answers.length||answers.some(a=>!isPublicAddress(a.address)))throw new Error('禁止访问内网或保留地址');
+  return answers;
+}
+export async function resolveWithFallback(host:string,system:Resolver,fallback:Resolver,signal?:AbortSignal):Promise<Answer[]>{
+  signal?.throwIfAborted();
+  let answers:Answer[];
+  try{answers=await abortable(system(host),signal);}catch{
+    signal?.throwIfAborted();
+    return checkedAnswers(await abortable(fallback(host),signal));
+  }
+  // Only the benchmark range used by Fake-IP proxies is eligible for re-resolution.
+  // Private addresses in real DNS records remain blocked without a fallback.
+  const fake=(address:string)=>/^198\.(18|19)\./.test(address)&&ipaddr.isValid(address);
+  if(answers.some(a=>fake(a.address))&&answers.every(a=>fake(a.address)||isPublicAddress(a.address)))
+    return checkedAnswers(await abortable(fallback(host),signal));
+  return checkedAnswers(answers);
+}
+async function queryPublicDns(host:string,provider:'alidns'|'cloudflare',signal?:AbortSignal):Promise<Answer[]>{
+  const url=new URL(provider==='alidns'?'https://dns.alidns.com/resolve':'https://cloudflare-dns.com/dns-query');url.searchParams.set('name',host);url.searchParams.set('type','A');
+  const requestSignal=AbortSignal.any([AbortSignal.timeout(3000),...(signal?[signal]:[])]);
   const data=await new Promise<string>((resolve,reject)=>{
-    const req=https.get(url,{signal,family:4,lookup:((_h:any,_o:any,cb:any)=>cb(null,'1.1.1.1',4)) as any,headers:{accept:'application/dns-json'},timeout:8000},async res=>{
+    const req=https.get(url,{signal:requestSignal,family:4,lookup:pinnedLookup({address:provider==='alidns'?'223.5.5.5':'1.1.1.1',family:4}) as any,headers:{accept:'application/dns-json'}},async res=>{
       try{if(res.statusCode!==200){res.destroy();throw new Error('公共 DNS 暂不可用');}resolve(await readText(res,64*1024));}catch(e){reject(e);}
-    });req.on('error',reject);req.on('timeout',()=>req.destroy(new Error('公共 DNS 查询超时')));
+    });req.on('error',reject);
   });
   const record=JSON.parse(data);
   const answers:Answer[]=(record.Answer||[]).filter((a:any)=>a.type===1).map((a:any)=>({address:String(a.data),family:4}));
-  if(!answers.length)throw new Error('公共 DNS 未返回地址');
-  if(dnsCache.size>=1000)dnsCache.clear();dnsCache.set(host,{expires:Date.now()+60000,answers});return answers;
+  return checkedAnswers(answers);
+}
+async function resolveHostname(host:string,signal?:AbortSignal):Promise<Answer[]>{
+  const mode=process.env.WATCHTV_PUBLIC_DNS;
+  const key=`${mode||'auto'}:${host}`;
+  const cached=dnsCache.get(key);if(cached&&cached.expires>Date.now())return cached.answers;
+  const fallback=async()=>{
+    for(const provider of ['alidns','cloudflare'] as const){
+      try{return await queryPublicDns(host,provider,signal);}catch{signal?.throwIfAborted();}
+    }
+    throw new Error('域名解析失败，请检查网络或代理 DNS 设置');
+  };
+  const answers=mode==='cloudflare'?await queryPublicDns(host,'cloudflare',signal):await resolveWithFallback(host,
+    name=>abortable(lookup(name,{all:true}),AbortSignal.any([AbortSignal.timeout(3000),...(signal?[signal]:[])])),fallback,signal);
+  if(dnsCache.size>=1000)dnsCache.clear();dnsCache.set(key,{expires:Date.now()+60000,answers});return answers;
 }
 export function pinnedLookup(answer: Answer) {
   return (_host: string, options: {all?: boolean}, callback: (...args: any[]) => void) => {
