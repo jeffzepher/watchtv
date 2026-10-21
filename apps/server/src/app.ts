@@ -38,10 +38,10 @@ export async function createApp(options: AppOptions = {}) {
   app.get('/health',async()=>({ok:true,service:'watchtv',version:'0.1.0'}));
   app.get('/api/recommendations',async(req)=>{
     const category=String((req.query as any).category||'tv');
-    const categories:Record<string,[string,string]>={tv:['tv','热门'],movie:['movie','热门'],variety:['tv','综艺'],animation:['tv','日本动画'],documentary:['movie','纪录片']};
+    const categories:Record<string,[string,string]>={tv:['tv','热门'],movie:['movie','热门'],variety:['tv','综艺'],animation:['tv','日本动画'],documentary:['movie','纪录片'],children:['movie','儿童'],short:['movie','短剧'],us:['tv','美剧']};
     if(!categories[category])throw new Error('无效推荐分类');
     const cached=recommendations.get(category);
-    if(cached&&cached.expires>Date.now())return {items:cached.items,source:'豆瓣热门',updatedAt:cached.expires-3600000};
+    if((req.query as any).refresh!=='1'&&cached&&cached.expires>Date.now())return {items:cached.items,source:'豆瓣热门',updatedAt:cached.expires-3600000};
     const [type,tag]=categories[category];
     const url=new URL('https://movie.douban.com/j/search_subjects');
     for(const [key,value] of Object.entries({type,tag,sort:'recommend',page_limit:'40',page_start:'0'}))url.searchParams.set(key,value);
