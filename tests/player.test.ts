@@ -2,7 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {episodeIndexByName} from '../packages/core/src/index.ts';
 import {parseBackup,mergeVideos,SseDecoder,searchRequestForPage} from '../apps/web/src/lib/state.ts';
-import {startPlayback} from '../apps/web/src/lib/playback.ts';
+import {startPlayback,playbackFailure} from '../apps/web/src/lib/playback.ts';
+
+test('playback failure explains upstream rejection and HTML player pages',()=>{
+ assert.match(playbackFailure('https://example.com/index.m3u8',403),/403/);
+ assert.match(playbackFailure('https://example.com/share/abc'),/网页播放/);
+ assert.match(playbackFailure('https://example.com/v.m3u8',400,'上游返回 HTTP 404'),/404/);
+});
 test('source switching preserves episode only on unambiguous match',()=>{
  assert.equal(episodeIndexByName('第01集',['第1集','第2集']),0);
  assert.equal(episodeIndexByName('第1集',['第1集','第01集']),-1);

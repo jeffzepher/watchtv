@@ -17,6 +17,7 @@ export async function createApp(options: AppOptions = {}) {
   const auth=createAuth(options.password);const tickets=createTickets(options.secret||randomBytes(32).toString('hex'));
   const json=options.fetchJson||realFetchJson;
   let searches=0,mediaCount=0;
+  const recommendations=new Map<string,{expires:number;items:any[]}>();
   await app.register(cookie);
   await app.register(rateLimit,{max:120,timeWindow:'1 minute'});
   app.addHook('onRequest',async(req,reply)=>{
@@ -35,6 +36,32 @@ export async function createApp(options: AppOptions = {}) {
     reply.code(status && status>=400&&status<500?status:400).send({error:error instanceof Error?error.message:'请求失败'});
   });
   app.get('/health',async()=>({ok:true,service:'watchtv',version:'0.1.0'}));
+  app.get('/api/recommendations',async(req)=>{
+    const category=String((req.query as any).category||'tv');
+    const categories:Record<string,[string,string]>={tv:['tv','热门'],movie:['movie','热门'],variety:['tv','综艺'],animation:['tv','日本动画'],documentary:['movie','纪录片']};
+    if(!categories[category])throw new Error('无效推荐分类');
+    const cached=recommendations.get(category);
+    if(cached&&cached.expires>Date.now())return {items:cached.items,source:'豆瓣热门',updatedAt:cached.expires-3600000};
+    const [type,tag]=categories[category];
+    const url=new URL('https://movie.douban.com/j/search_subjects');
+    for(const [key,value] of Object.entries({type,tag,sort:'recommend',page_limit:'40',page_start:'0'}))url.searchParams.set(key,value);
+    const data=await json(url,AbortSignal.timeout(12000));
+    if(!Array.isArray(data.subjects))throw new Error('热门榜单暂时不可用，请稍后重试');
+    const items=data.subjects.slice(0,40).filter((s:any)=>typeof s.title==='string'&&s.title.trim()).map((s:any)=>({id:String(s.id),title:s.title.slice(0,150),cover:typeof s.cover==='string'&&/^https:\/\/img\d*\.doubanio\.com\//.test(s.cover)?s.cover:'',rate:typeof s.rate==='string'&&/^\d(\.\d)?$/.test(s.rate)?s.rate:'',note:typeof s.episodes_info==='string'?s.episodes_info.slice(0,80):''}));
+    for(const item of items)if(item.cover)item.cover=`/api/poster?ticket=${encodeURIComponent(tickets.sign(item.cover))}`;
+    recommendations.set(category,{expires:Date.now()+3600000,items});
+    return {items,source:'豆瓣热门',updatedAt:Date.now()};
+  });
+  app.get('/api/poster',async(req,reply)=>{
+    const url=new URL(tickets.verify(String((req.query as any).ticket||'')));
+    if(url.protocol!=='https:'||!/^img\d*\.doubanio\.com$/.test(url.hostname))throw new Error('不允许的海报来源');
+    const body=await safeFetch(url,{signal:AbortSignal.timeout(12000),headers:{Referer:'https://movie.douban.com/'}});
+    const type=String(body.headers['content-type']||'');
+    if(!/^image\/(jpeg|png|webp|avif)(?:;|$)/i.test(type)){body.destroy();throw new Error('海报格式不可用');}
+    const chunks:Buffer[]=[];let size=0;
+    try{for await(const chunk of body){size+=chunk.length;if(size>4*1024*1024)throw new Error('海报超过大小限制');chunks.push(Buffer.from(chunk));}}catch(e){body.destroy();throw e;}
+    return reply.type(type).header('Cache-Control','private, max-age=3600').send(Buffer.concat(chunks));
+  });
   app.get('/api/session',async(req)=>({authenticated:auth.valid(req.cookies.watchtv_session),required:auth.required}));
   app.post('/api/login',{config:{rateLimit:{max:8,timeWindow:'1 minute'}}},async(req,reply)=>{
     const token=auth.login((req.body as any)?.password);

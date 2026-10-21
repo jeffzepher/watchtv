@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {X,Heart,Play,ArrowLeft,LoaderCircle} from 'lucide-react';
 import type {Video,HistoryEntry} from '../../../../packages/core/src/types.ts';
-import {episodeIndexByName} from '../../../../packages/core/src/index.ts';
+import {episodeIndexByName,preferredLine} from '../../../../packages/core/src/index.ts';
 import {api} from '../lib/api.ts';
 import {Poster} from './VideoCard.tsx';
 import Player from './Player.tsx';
@@ -12,9 +12,9 @@ export default function Detail({initial,alternatives,history,favorite,onFavorite
  const matching=useRef<{name:string;time:number}|null>(null);const request=useRef(0);
  async function load(v:Video){const seq=++request.current;setLoading(true);setError('');
   try{const data=await api<{video:Video;proxy:string[][]}>('/api/detail',{source:v.source,id:v.id});if(seq!==request.current)return;
-   setVideo(data.video);setProxy(data.proxy);setLine(0);setEpisode(0);setResume(0);
+   const preferred=preferredLine(data.video.lines);setVideo(data.video);setProxy(data.proxy);setLine(preferred);setEpisode(0);setResume(0);
    const old=matching.current;matching.current=null;
-   if(old){const index=episodeIndexByName(old.name,data.video.lines[0]?.episodes.map(e=>e.name)||[]);if(index>=0){setEpisode(index);setResume(old.time);}else{setPlaying(false);notify('新来源未匹配到同一集，请重新选择剧集');}}
+   if(old){const index=episodeIndexByName(old.name,data.video.lines[preferred]?.episodes.map(e=>e.name)||[]);if(index>=0){setEpisode(index);setResume(old.time);}else{setPlaying(false);notify('新来源未匹配到同一集，请重新选择剧集');}}
    else if(v.key===initial.key&&prior){const episodes=data.video.lines[prior.line]?.episodes;if(episodes?.[prior.episode]){setLine(prior.line);setEpisode(prior.episode);setResume(prior.time);}}
   }catch(e){if(seq===request.current)setError((e as Error).message);}finally{if(seq===request.current)setLoading(false);}
  }

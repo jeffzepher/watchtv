@@ -1,4 +1,8 @@
 export * from './types.ts';
+export function preferredLine(lines: import('./types.ts').PlayLine[]): number {
+  const index=lines.findIndex(l=>l.episodes.some(e=>/\.(m3u8|mp4|webm|m4v)(?:\?|$)/i.test(e.url)));
+  return index<0?0:index;
+}
 import type { Source, Video, VideoGroup } from './types.ts';
 
 export function httpUrl(value: unknown): string {
