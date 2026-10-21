@@ -1,0 +1,44 @@
+{
+  "name": "watchtv",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Your personal cinema. Multi-source search, watchlists and a desktop player.",
+  "author": "jeffzepher",
+  "license": "MIT",
+  "workspaces": ["apps/web", "apps/server", "apps/desktop", "packages/core"],
+  "engines": {"node": ">=22.16"},
+  "scripts": {
+    "test": "tsx --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "vite build --config apps/web/vite.config.ts && esbuild apps/server/src/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/server.js && esbuild apps/server/src/app.ts --bundle --platform=node --format=cjs --packages=external --outfile=dist/app.cjs",
+    "dev": "tsx apps/server/src/index.ts",
+    "start": "node --env-file-if-exists=.env dist/server.js",
+    "desktop": "electron apps/desktop/main.cjs",
+    "desktop:pack": "electron-builder --win portable --config apps/desktop/builder.json"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/rate-limit": "^10.3.0",
+    "@fastify/static": "^8.3.0",
+    "fastify": "^5.6.0",
+    "hls.js": "^1.6.13",
+    "idb": "^8.0.3",
+    "ipaddr.js": "^2.2.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^4.7.0",
+    "electron": "^42.0.0",
+    "electron-builder": "^26.0.12",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vite": "^6.4.0"
+  }
+}
