@@ -19,7 +19,15 @@ export async function createApp(options: AppOptions = {}) {
   let searches=0,mediaCount=0;
   const recommendations=new Map<string,{expires:number;items:any[]}>();
   await app.register(cookie);
-  await app.register(rateLimit,{max:120,timeWindow:'1 minute'});
+  await app.register(rateLimit,{
+    max:120,timeWindow:'1 minute',
+    allowList:req=>!req.url.startsWith('/api/'),
+    keyGenerator:req=>{
+      const route=req.routeOptions.url;
+      const group=route==='/api/poster'?'poster':route==='/api/media'?'media':route==='/api/login'?'login':'api';
+      return `${req.ip}:${group}`;
+    }
+  });
   app.addHook('onRequest',async(req,reply)=>{
     reply.header('X-Content-Type-Options','nosniff').header('Referrer-Policy','no-referrer').header('X-Frame-Options','DENY');
     reply.header('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: http: data:; media-src 'self' blob: https: http:; connect-src 'self' https: http:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'");
@@ -52,7 +60,7 @@ export async function createApp(options: AppOptions = {}) {
     recommendations.set(category,{expires:Date.now()+3600000,items});
     return {items,source:'豆瓣热门',updatedAt:Date.now()};
   });
-  app.get('/api/poster',async(req,reply)=>{
+  app.get('/api/poster',{config:{rateLimit:{max:600,timeWindow:'1 minute'}}},async(req,reply)=>{
     const url=new URL(tickets.verify(String((req.query as any).ticket||'')));
     if(url.protocol!=='https:'||!/^img\d*\.doubanio\.com$/.test(url.hostname))throw new Error('不允许的海报来源');
     const body=await safeFetch(url,{signal:AbortSignal.timeout(12000),headers:{Referer:'https://movie.douban.com/'}});

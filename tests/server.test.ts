@@ -2,6 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createApp} from '../apps/server/src/app.ts';
 const source={name:'Example',url:'https://example.com/api',enabled:true};
+test('poster traffic does not exhaust API limits and API limits do not block page navigation',async()=>{
+ const app=await createApp();
+ try {
+  for(let i=0;i<125;i++)assert.equal((await app.inject('/api/poster?ticket=invalid')).statusCode,400);
+  assert.equal((await app.inject('/api/session')).statusCode,200);
+  for(let i=0;i<120;i++)await app.inject('/api/session');
+  assert.equal((await app.inject('/api/session')).statusCode,429);
+  assert.equal((await app.inject('/health')).statusCode,200);
+  assert.equal((await app.inject('/')).statusCode,404);
+ } finally {await app.close();}
+});
 test('authentication protects API, sets private cookie and rejects cross origin writes',async()=>{
  const app=await createApp({password:'a-long-test-password',secret:'test-secret',fetchJson:async()=>({list:[]})});
  try {
