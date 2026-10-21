@@ -22,7 +22,7 @@
     "signExecutable": false,
     "icon": "apps/desktop/icon.ico"
   },
-  "artifactName": "WatchTV-${version}-${arch}.${ext}",
+  "artifactName": "WatchTV-v03-${arch}.${ext}",
   "electronDownload": {
     "mirror": "https://npmmirror.com/mirrors/electron/"
   }

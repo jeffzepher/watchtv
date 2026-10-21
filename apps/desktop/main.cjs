@@ -8,7 +8,7 @@ if(!app.requestSingleInstanceLock())app.quit();
 else {
  app.on('second-instance',()=>{if(win){if(win.isMinimized())win.restore();win.focus();}});
  app.whenReady().then(async()=>{
-  process.env.WATCHTV_PUBLIC_DNS ||= 'cloudflare';
+  // Use the operating system DNS by default so the app works across home networks.
   const root=app.isPackaged?app.getAppPath():path.resolve(__dirname,'../..');
   const {createApp}=require(path.join(root,'dist/app.cjs'));
   const token=crypto.randomBytes(32).toString('hex');
