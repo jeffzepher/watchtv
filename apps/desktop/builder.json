@@ -1,10 +1,29 @@
 {
-  "appId":"dev.watchtv.desktop",
-  "productName":"WatchTV",
-  "directories":{"output":"release"},
-  "extraMetadata":{"main":"apps/desktop/main.cjs"},
-  "files":["dist/**","apps/desktop/main.cjs","apps/desktop/policy.cjs","package.json"],
-  "win":{"target":["portable"],"signAndEditExecutable":false},
-  "artifactName":"WatchTV-${version}-${arch}.${ext}",
-  "electronDownload":{"mirror":"https://npmmirror.com/mirrors/electron/"}
+  "appId": "dev.watchtv.desktop",
+  "productName": "WatchTV",
+  "directories": {
+    "output": "release"
+  },
+  "extraMetadata": {
+    "main": "apps/desktop/main.cjs"
+  },
+  "files": [
+    "dist/**",
+    "apps/desktop/main.cjs",
+    "apps/desktop/policy.cjs",
+    "package.json",
+    "apps/desktop/icon.png",
+    "apps/desktop/icon.ico"
+  ],
+  "win": {
+    "target": [
+      "portable"
+    ],
+    "signExecutable": false,
+    "icon": "apps/desktop/icon.ico"
+  },
+  "artifactName": "WatchTV-${version}-${arch}.${ext}",
+  "electronDownload": {
+    "mirror": "https://npmmirror.com/mirrors/electron/"
+  }
 }

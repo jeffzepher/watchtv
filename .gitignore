@@ -11,3 +11,5 @@ release/
 *.key
 *.tar
 *.tar.gz
+
+/LibreTV-original/

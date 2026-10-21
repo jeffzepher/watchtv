@@ -1,6 +1,6 @@
 {
   "name": "watchtv",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "Your personal cinema. Multi-source search, watchlists and a desktop player.",
