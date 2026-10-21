@@ -1,4 +1,4 @@
 import {defineConfig} from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
-export default defineConfig({root:path.resolve('apps/web'),plugins:[react()],build:{outDir:path.resolve('dist/web'),emptyOutDir:true}});
+export default defineConfig({root:path.resolve('apps/web'),plugins:[react()],build:{outDir:path.resolve('dist/web'),emptyOutDir:true,rollupOptions:{output:{manualChunks:{hls:['hls.js'],react:['react','react-dom']}}}}});

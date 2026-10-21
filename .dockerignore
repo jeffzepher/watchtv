@@ -1,0 +1,10 @@
+node_modules
+.git
+.local
+.superpowers
+.env
+.env.*
+release
+docs
+*.tar
+*.tar.gz

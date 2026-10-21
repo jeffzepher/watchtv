@@ -99,11 +99,12 @@ export async function createApp(options: AppOptions = {}) {
       const range=req.headers.range;if(range&&!/^bytes=\d*-\d*$/.test(range))throw new Error('Range 格式不正确');
       const body=await safeFetch(url,{signal:controller.signal,headers:range?{Range:range}:{}});
       const type=String(body.headers['content-type']||'');
-      const isHls=/mpegurl/i.test(type)||/\.m3u8$/i.test(url.pathname);
+      const finalUrl=new URL(body.url||url.href);
+      const isHls=/mpegurl/i.test(type)||/\.m3u8$/i.test(finalUrl.pathname);
       reply.code(body.statusCode||200);
       if(isHls){
         const text=await readText(body,2*1024*1024);
-        const base=new URL(body.url||url.href,url);
+        const base=finalUrl;
         return reply.type('application/vnd.apple.mpegurl').send(rewritePlaylist(text,base,target=>`/api/media?ticket=${encodeURIComponent(tickets.sign(target))}`));
       }
       const ext=path.extname(url.pathname).toLowerCase();

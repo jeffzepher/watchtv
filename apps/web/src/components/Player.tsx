@@ -3,6 +3,7 @@ import Hls from 'hls.js';
 import {ArrowRight,RefreshCw} from 'lucide-react';
 import type {Video,HistoryEntry} from '../../../../packages/core/src/types.ts';
 import {saveProgress} from '../lib/storage.ts';
+import {startPlayback} from '../lib/playback.ts';
 
 export default function Player({video,line,episode,proxy,initialTime,onEpisode,onSaved,onError}:{video:Video;line:number;episode:number;proxy:string[][];initialTime:number;onEpisode:(i:number)=>void;onSaved:()=>void;onError:(message:string)=>void}){
  const ref=useRef<HTMLVideoElement>(null);const [useProxy,setUseProxy]=useState(false);const [error,setError]=useState('');const [speed,setSpeed]=useState(1);const [auto,setAuto]=useState(true);
@@ -14,7 +15,7 @@ export default function Player({video,line,episode,proxy,initialTime,onEpisode,o
   const src=useProxy?proxy[line]?.[episode]:current.url;
   if(!src){setError('此线路没有可用的播放地址');return;}
   const fail=()=>{if(!alive)return;if(!useProxy&&proxy[line]?.[episode])setUseProxy(true);else setError('播放失败：来源可能失效或不支持此格式，请切换线路或来源。');};
-  const ready=()=>{if(initialTime>0&&Number.isFinite(el.duration))el.currentTime=Math.min(initialTime,Math.max(0,el.duration-2));el.playbackRate=speed;};
+  const ready=()=>{if(initialTime>0&&Number.isFinite(el.duration))el.currentTime=Math.min(initialTime,Math.max(0,el.duration-2));el.playbackRate=speed;void startPlayback(el);};
   el.addEventListener('loadedmetadata',ready);el.addEventListener('error',fail);
   if(/\.m3u8(?:\?|$)/i.test(current.url)||useProxy&&/m3u8/i.test(current.url)){
    if(el.canPlayType('application/vnd.apple.mpegurl'))el.src=src;
