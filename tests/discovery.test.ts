@@ -48,7 +48,7 @@ test('children, short dramas and US series request their own recommendation tags
  } finally {await app.close();}
 });
 
-test('genre and page are forwarded and cached separately',async()=>{
- const requests:URL[]=[];const app=await createApp({fetchJson:async u=>{requests.push(new URL(u));return {subjects:Array.from({length:41},(_,i)=>({id:String(i),title:`电影${i}`}))};}});
- try{const r=await app.inject('/api/recommendations?category=movie&genre=动作&page=2');assert.equal(r.statusCode,200);assert.equal(r.json().items.length,40);assert.equal(r.json().hasMore,true);assert.equal(requests[0].searchParams.get('tag'),'动作');assert.equal(requests[0].searchParams.get('page_start'),'40');await app.inject('/api/recommendations?category=movie&genre=喜剧&page=2');assert.equal(requests.length,2);assert.equal((await app.inject('/api/recommendations?genre=invalid')).statusCode,400);}finally{await app.close();}
+test('category and genre are combined with correct upstream offsets',async()=>{
+ const requests:URL[]=[];const app=await createApp({fetchJson:async u=>{requests.push(new URL(u));return {data:Array.from({length:20},(_,i)=>({id:String(Number(u.searchParams.get('start'))+i),title:`影片${i}`}))};}});
+ try{const r=await app.inject('/api/recommendations?category=animation&genre=动作&page=2');assert.equal(r.statusCode,200);assert.equal(r.json().items.length,40);assert.equal(r.json().hasMore,true);assert.equal(requests[0].searchParams.get('tags'),'动画,动作');assert.deepEqual(requests.map(u=>u.searchParams.get('start')),['40','60','80']);await app.inject('/api/recommendations?category=animation&genre=喜剧&page=2');assert.equal(requests.length,6);assert.equal((await app.inject('/api/recommendations?genre=invalid')).statusCode,400);}finally{await app.close();}
 });

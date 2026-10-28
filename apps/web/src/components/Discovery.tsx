@@ -3,6 +3,13 @@ import {RefreshCw,ArrowRight,Flame,Play} from 'lucide-react';
 import {api} from '../lib/api.ts';
 interface Item {id:string;title:string;cover:string;rate:string;note:string}
 const CATEGORIES=[['tv','剧集'],['variety','综艺'],['movie','电影'],['animation','动漫'],['documentary','纪录片'],['children','儿童'],['short','短剧'],['us','美剧']] as const;
+const GENRES:Record<string,string[]>={
+ movie:['动作','喜剧','爱情','科幻','悬疑','惊悚','恐怖','动画','剧情','犯罪','冒险','奇幻','战争','纪录片'],
+ tv:['动作','喜剧','爱情','科幻','悬疑','惊悚','剧情','犯罪','冒险','奇幻','战争','家庭'],
+ animation:['动作','喜剧','爱情','科幻','悬疑','冒险','奇幻','剧情','家庭'],
+ variety:['音乐','真人秀','脱口秀','喜剧'], documentary:['自然','历史','音乐','传记','战争'],
+ children:['动画','冒险','喜剧','家庭','奇幻'],short:['动画','喜剧','爱情','剧情','悬疑'],us:['动作','喜剧','爱情','科幻','悬疑','犯罪','奇幻','剧情']
+};
 export default function Discovery({onSearch}:{onSearch:(s:string)=>void}){
  const [category,setCategory]=useState('tv');const [genre,setGenre]=useState('');const [page,setPage]=useState(1);const [hasMore,setHasMore]=useState(false);const [items,setItems]=useState<Item[]>([]);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [retry,setRetry]=useState(0);const [status,setStatus]=useState('');
  useEffect(()=>{const controller=new AbortController();setLoading(true);setItems([]);setError('');setStatus('');
@@ -10,7 +17,7 @@ export default function Discovery({onSearch}:{onSearch:(s:string)=>void}){
  },[category,genre,page,retry]);
  return <div className="discovery">
  <section className="discovery-library"><div className="discovery-filter-heading"><h2>分类浏览</h2><span>豆瓣片单 · 按评分排序</span></div><div className="discovery-tabs" role="tablist" aria-label="推荐分类">{CATEGORIES.map(([id,label])=><button key={id} role="tab" aria-selected={id===category} className={category===id?'active':''} onClick={()=>{setRetry(0);setGenre('');setPage(1);setCategory(id);}}>{label}</button>)}</div>
- {(category==='movie'||category==='tv')&&<div className="discovery-genres" aria-label="影片类型"><span>类型</span>{['全部','动作','喜剧','爱情','科幻','悬疑','惊悚','恐怖','动画','剧情','犯罪','冒险','奇幻','战争','纪录片'].map(g=><button key={g} className={(g==='全部'?!genre:genre===g)?'active':''} onClick={()=>{setGenre(g==='全部'?'':g);setPage(1);setRetry(0);}}>{g}</button>)}</div>}
+ {<div className="discovery-genres" aria-label="影片类型"><span>类型</span>{['全部',...(GENRES[category]||[])].map(g=><button key={g} className={(g==='全部'?!genre:genre===g)?'active':''} onClick={()=>{setGenre(g==='全部'?'':g);setPage(1);setRetry(0);}}>{g}</button>)}</div>}
  <div className="discovery-section-heading"><h2><Flame size={18}/>{CATEGORIES.find(c=>c[0]===category)?.[1]}</h2><button className="text-button" disabled={loading} onClick={()=>setRetry(n=>n+1)}><RefreshCw size={14}/>{loading?'加载中…':'刷新推荐'}</button></div>
  <p className="recommendation-status" role="status">{status}</p>
  {loading?<div className="recommendation-grid" aria-label="正在加载热门推荐">{Array.from({length:20},(_,i)=><div key={i} className="recommendation-skeleton"><div/><i/></div>)}</div>:error?<div className="empty-state"><p role="alert">{error}</p><button onClick={()=>setRetry(n=>n+1)}>重新加载<RefreshCw size={15}/></button></div>:items.length?<div className="recommendation-grid">{items.map((item,index)=><button key={item.id} className="recommendation-card" onClick={()=>onSearch(item.title)} aria-label={`搜索 ${item.title}`}><div className="recommendation-poster">{item.cover&&<img src={item.cover} alt="" loading="lazy" referrerPolicy="no-referrer" onError={e=>{e.currentTarget.style.display='none';}}/>}<span className="recommendation-placeholder">{item.title.slice(0,1)}</span><span className="recommendation-rank">{String((page-1)*40+index+1).padStart(2,'0')}</span>{item.rate&&<span className="recommendation-rating">★ {item.rate}</span>}<span className="recommendation-play"><Play size={25} fill="currentColor"/></span></div><h3>{item.title}</h3><p>{item.note||'搜索可播放来源'}<ArrowRight size={12}/></p></button>)}</div>:<div className="empty-state">此分类暂时没有推荐影片，请稍后刷新或使用顶部搜索</div>}

@@ -48,20 +48,30 @@ export async function createApp(options: AppOptions = {}) {
     const category=String((req.query as any).category||'tv');
     const categories:Record<string,[string,string]>={tv:['tv','热门'],movie:['movie','热门'],variety:['tv','综艺'],animation:['tv','日本动画'],documentary:['movie','纪录片'],children:['movie','儿童'],short:['movie','短剧'],us:['tv','美剧']};
     if(!categories[category])throw new Error('无效推荐分类');
-    const q=req.query as any; const genres=['热门','动作','喜剧','爱情','科幻','悬疑','惊悚','恐怖','动画','剧情','犯罪','冒险','奇幻','战争','纪录片'];
+    const q=req.query as any; const genres=['热门','动作','喜剧','爱情','科幻','悬疑','惊悚','恐怖','动画','剧情','犯罪','冒险','奇幻','战争','纪录片','音乐','真人秀','脱口秀','家庭','自然','历史','传记'];
     const page=Math.max(1,Math.min(500,Number.parseInt(String(q.page||'1'),10)||1));
     const genre=String(q.genre||''); if(genre&&!genres.includes(genre))throw new Error('无效影片类型');
     const key=`${category}:${genre}:${page}`; const cached=recommendations.get(key);
     if((req.query as any).refresh!=='1'&&cached&&cached.expires>Date.now())return {items:cached.items,hasMore:cached.hasMore,source:'豆瓣热门',updatedAt:cached.expires-3600000};
-    const [type,defaultTag]=categories[category]; const tag=genre||defaultTag;
-    const url=new URL('https://movie.douban.com/j/search_subjects');
-    for(const [key,value] of Object.entries({type,tag,sort:'rank',page_limit:'41',page_start:String((page-1)*40)}))url.searchParams.set(key,value);
-    const data=await json(url,AbortSignal.timeout(12000));
-    if(!Array.isArray(data.subjects))throw new Error('热门榜单暂时不可用，请稍后重试');
-    const items=data.subjects.slice(0,40).filter((s:any)=>typeof s.title==='string'&&s.title.trim()).map((s:any)=>({id:String(s.id),title:s.title.slice(0,150),cover:typeof s.cover==='string'&&/^https:\/\/img\d*\.doubanio\.com\//.test(s.cover)?s.cover:'',rate:typeof s.rate==='string'&&/^\d(\.\d)?$/.test(s.rate)?s.rate:'',note:typeof s.episodes_info==='string'?s.episodes_info.slice(0,80):''}));
+    const [type,defaultTag]=categories[category];
+    let subjects:any[];
+    if(genre){
+      const base:Record<string,string>={tv:'电视剧',movie:'电影',animation:'动画',variety:'综艺',documentary:'纪录片',children:'儿童',short:'短片',us:'美剧'};
+      const urls=[0,20,40].map(offset=>{const url=new URL('https://movie.douban.com/j/new_search_subjects');for(const [key,value] of Object.entries({sort:'S',range:'0,10',tags:`${base[category]},${genre}`,start:String((page-1)*40+offset)}))url.searchParams.set(key,value);return url;});
+      const pages=await Promise.all(urls.map(url=>json(url,AbortSignal.timeout(12000))));
+      if(pages.some(p=>!Array.isArray(p.data)))throw new Error('分类片单暂时不可用，请稍后重试');
+      subjects=pages.flatMap(p=>p.data).slice(0,41);
+    }else{
+      const url=new URL('https://movie.douban.com/j/search_subjects');
+      for(const [key,value] of Object.entries({type,tag:defaultTag,sort:'rank',page_limit:'41',page_start:String((page-1)*40)}))url.searchParams.set(key,value);
+      const data=await json(url,AbortSignal.timeout(12000));
+      if(!Array.isArray(data.subjects))throw new Error('热门榜单暂时不可用，请稍后重试');
+      subjects=data.subjects;
+    }
+    const items=subjects.slice(0,40).filter((s:any)=>typeof s.title==='string'&&s.title.trim()).map((s:any)=>({id:String(s.id),title:s.title.slice(0,150),cover:typeof s.cover==='string'&&/^https:\/\/img\d*\.doubanio\.com\//.test(s.cover)?s.cover:'',rate:typeof s.rate==='string'&&/^\d(\.\d)?$/.test(s.rate)?s.rate:'',note:typeof s.episodes_info==='string'?s.episodes_info.slice(0,80):''}));
     for(const item of items)if(item.cover)item.cover=`/api/poster?ticket=${encodeURIComponent(tickets.sign(item.cover))}`;
-    recommendations.set(key,{expires:Date.now()+3600000,items,hasMore:data.subjects.length>40});
-    return {items,hasMore:data.subjects.length>40,source:'豆瓣热门',updatedAt:Date.now()};
+    recommendations.set(key,{expires:Date.now()+3600000,items,hasMore:subjects.length>40});
+    return {items,hasMore:subjects.length>40,source:'豆瓣热门',updatedAt:Date.now()};
   });
   app.get('/api/poster',{config:{rateLimit:{max:600,timeWindow:'1 minute'}}},async(req,reply)=>{
     const url=new URL(tickets.verify(String((req.query as any).ticket||'')));
