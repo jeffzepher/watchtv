@@ -13,7 +13,7 @@ test('popular recommendations preserve upstream order, validate fields and white
  const res=await app.inject('/api/recommendations?category=tv');
  assert.equal(res.statusCode,200);assert.equal(res.json().items[0].title,'热播剧');assert.equal(res.json().items[1].cover,'');
  assert.match(res.json().items[0].cover,/^\/api\/poster\?ticket=/);
- assert.match(requested,/sort=recommend/);
+ assert.match(requested,/sort=rank/);
  assert.equal((await app.inject('/api/recommendations?category=invalid')).statusCode,400);
  await app.close();
 });
@@ -46,4 +46,9 @@ test('children, short dramas and US series request their own recommendation tags
    assert.equal(requested?.searchParams.get('type'),type);
   }
  } finally {await app.close();}
+});
+
+test('genre and page are forwarded and cached separately',async()=>{
+ const requests:URL[]=[];const app=await createApp({fetchJson:async u=>{requests.push(new URL(u));return {subjects:Array.from({length:41},(_,i)=>({id:String(i),title:`电影${i}`}))};}});
+ try{const r=await app.inject('/api/recommendations?category=movie&genre=动作&page=2');assert.equal(r.statusCode,200);assert.equal(r.json().items.length,40);assert.equal(r.json().hasMore,true);assert.equal(requests[0].searchParams.get('tag'),'动作');assert.equal(requests[0].searchParams.get('page_start'),'40');await app.inject('/api/recommendations?category=movie&genre=喜剧&page=2');assert.equal(requests.length,2);assert.equal((await app.inject('/api/recommendations?genre=invalid')).statusCode,400);}finally{await app.close();}
 });
