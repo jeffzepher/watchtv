@@ -57,10 +57,14 @@ export async function createApp(options: AppOptions = {}) {
     let subjects:any[];
     if(genre){
       const base:Record<string,string>={tv:'电视剧',movie:'电影',animation:'动画',variety:'综艺',documentary:'纪录片',children:'儿童',short:'短片',us:'美剧'};
-      const urls=[0,20,40].map(offset=>{const url=new URL('https://movie.douban.com/j/new_search_subjects');for(const [key,value] of Object.entries({sort:'S',range:'0,10',tags:`${base[category]},${genre}`,start:String((page-1)*40+offset)}))url.searchParams.set(key,value);return url;});
-      const pages=await Promise.all(urls.map(url=>json(url,AbortSignal.timeout(12000))));
-      if(pages.some(p=>!Array.isArray(p.data)))throw new Error('分类片单暂时不可用，请稍后重试');
-      subjects=pages.flatMap(p=>p.data).slice(0,41);
+      const urls=[0,20].map(offset=>{const url=new URL('https://movie.douban.com/j/new_search_subjects');for(const [key,value] of Object.entries({sort:'S',range:'0,10',tags:`${base[category]},${genre}`,start:String((page-1)*40+offset)}))url.searchParams.set(key,value);return url;});
+      const pages:any[]=[];
+      for(const url of urls){
+        const result=await json(url,AbortSignal.timeout(12000));
+        if(!Array.isArray(result.data)){if(result.r===1)throw new Error('豆瓣暂时限制了分类请求，请稍后重试');throw new Error('豆瓣分类接口暂时不可用，请稍后重试');}
+        pages.push(result.data); if(result.data.length<20)break;
+      }
+      subjects=pages.flat();
     }else{
       const url=new URL('https://movie.douban.com/j/search_subjects');
       for(const [key,value] of Object.entries({type,tag:defaultTag,sort:'rank',page_limit:'41',page_start:String((page-1)*40)}))url.searchParams.set(key,value);
@@ -70,8 +74,9 @@ export async function createApp(options: AppOptions = {}) {
     }
     const items=subjects.slice(0,40).filter((s:any)=>typeof s.title==='string'&&s.title.trim()).map((s:any)=>({id:String(s.id),title:s.title.slice(0,150),cover:typeof s.cover==='string'&&/^https:\/\/img\d*\.doubanio\.com\//.test(s.cover)?s.cover:'',rate:typeof s.rate==='string'&&/^\d(\.\d)?$/.test(s.rate)?s.rate:'',note:typeof s.episodes_info==='string'?s.episodes_info.slice(0,80):''}));
     for(const item of items)if(item.cover)item.cover=`/api/poster?ticket=${encodeURIComponent(tickets.sign(item.cover))}`;
-    recommendations.set(key,{expires:Date.now()+3600000,items,hasMore:subjects.length>40});
-    return {items,hasMore:subjects.length>40,source:'豆瓣热门',updatedAt:Date.now()};
+    const hasMore=genre?subjects.length===40:subjects.length>40;
+    recommendations.set(key,{expires:Date.now()+3600000,items,hasMore});
+    return {items,hasMore,source:'豆瓣热门',updatedAt:Date.now()};
   });
   app.get('/api/poster',{config:{rateLimit:{max:600,timeWindow:'1 minute'}}},async(req,reply)=>{
     const url=new URL(tickets.verify(String((req.query as any).ticket||'')));
