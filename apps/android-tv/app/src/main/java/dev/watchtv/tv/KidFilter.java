@@ -3,7 +3,7 @@ import java.text.Normalizer;
 import java.util.Locale;
 public final class KidFilter {
  private static String normal(String value){return value==null?"":Normalizer.normalize(value,Normalizer.Form.NFKC).replaceAll("\\s+","").toLowerCase(Locale.ROOT);}
- private static boolean sequel(String rest){return rest.isEmpty()||rest.matches("(?:第?[0-9零一二三四五六七八九十百]+季|第?[0-9零一二三四五六七八九十百]+部)(?:\\((?:普通话|国语|中文版|原声版|普通话版)\\))?");}
+ private static boolean sequel(String rest){return rest.isEmpty()||rest.matches("(?:第?[0-9零一二三四五六七八九十百]+季|第?[0-9零一二三四五六七八九十百]+部)(?:(?:英文版|英语版|中文版|国语版)|\\((?:普通话|国语|中文版|英文版|英语版|原声版|普通话版)\\))?");}
  public static boolean matches(String selected,String candidate){
   String x=normal(selected),v=normal(candidate);if(x.isEmpty())return false;if(x.equals(v))return true;
   if(x.equals("小猪佩奇"))return v.startsWith(x)&&(sequel(v.substring(x.length()))||v.equals(x+"过大年"));
