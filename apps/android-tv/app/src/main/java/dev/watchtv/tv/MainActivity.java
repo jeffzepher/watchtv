@@ -39,9 +39,9 @@ public final class MainActivity extends Activity {
  private void showHome(){
   long id=++requestId;screen="home";frame("儿童动画");
   content.addView(label("想看的动画",22));
-  HorizontalScrollView strip=new HorizontalScrollView(this);strip.setHorizontalScrollBarEnabled(false);LinearLayout featuredRow=new LinearLayout(this);strip.addView(featuredRow);content.addView(strip);
+  HorizontalScrollView strip=new HorizontalScrollView(this);strip.setHorizontalScrollBarEnabled(false);strip.setFillViewport(true);LinearLayout featuredRow=new LinearLayout(this);featuredRow.setGravity(Gravity.CENTER);strip.addView(featuredRow);content.addView(strip);
   String[] featured={"小猪佩奇","斑马百科","汪汪队","布鲁伊","拉布拉多警长"};
-  for(String title:featured){LinearLayout card=posterCard(title,"",()->startSearch(title));featuredRow.addView(card);if(!"斑马百科".equals(title))loadFeaturedPoster(card,title,id);}
+  for(String title:featured){LinearLayout card=posterCard(title,"",()->startSearch(title));featuredRow.addView(card);if("小猪佩奇".equals(title))card.requestFocus();if(!"斑马百科".equals(title))loadFeaturedPoster(card,title,id);}
   content.addView(label("更多儿童动画 · 按评分排序",19));
   LinearLayout nav=new LinearLayout(this);TextView status=label("正在加载片单…",16);
   Button previous=button("上一页",()->{catalogPage=Math.max(0,catalogPage-1);showHome();});previous.setEnabled(catalogPage>0);nav.addView(previous);
@@ -51,7 +51,7 @@ public final class MainActivity extends Activity {
    String url=new Uri.Builder().scheme("https").authority("movie.douban.com").path("/j/new_search_subjects").appendQueryParameter("sort","S").appendQueryParameter("range","0,10").appendQueryParameter("tags","儿童,动画").appendQueryParameter("start",String.valueOf(page*20)).build().toString();
    JSONObject data=fetch(url);JSONArray list=data.optJSONArray("data");if(list==null)throw new IOException("片单暂时不可用，请稍后重试");
    runOnUiThread(()->{if(id!=requestId||!"home".equals(screen))return;status.setText(list.length()==0?"本页暂无动画片":"选择动画片后查看可播放线路");next.setEnabled(list.length()==20);
-    GridLayout grid=new GridLayout(this);grid.setColumnCount(5);content.addView(grid);
+    GridLayout grid=new GridLayout(this);grid.setColumnCount(5);LinearLayout.LayoutParams gridLayout=new LinearLayout.LayoutParams(-2,-2);gridLayout.gravity=Gravity.CENTER_HORIZONTAL;content.addView(grid,gridLayout);
     for(int i=0;i<list.length();i++){JSONObject item=list.optJSONObject(i);if(item==null)continue;String title=item.optString("title").trim();if(title.isEmpty())continue;String rate=item.optString("rate");LinearLayout card=posterCard(title,rate,()->startSearch(title));grid.addView(card);loadPoster(card,item.optString("cover"),id,"home");}
    });
   }catch(Exception e){runOnUiThread(()->{if(id==requestId&&"home".equals(screen)){status.setText("儿童动画片单暂时不可用，请检查网络后重试");addButton(content,"重新加载",this::showHome);}});}});
@@ -60,7 +60,7 @@ public final class MainActivity extends Activity {
   LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setPadding(dp(6),dp(6),dp(6),dp(6));card.setFocusable(true);card.setClickable(true);card.setContentDescription(title+(rate.isEmpty()?"":" 评分 "+rate));
   GradientDrawable background=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{Color.rgb(46,69,49),Color.rgb(25,34,29)});background.setCornerRadius(dp(9));
   FrameLayout poster=new FrameLayout(this);poster.setBackground(background);TextView placeholder=label(title.substring(0,1),46);placeholder.setGravity(Gravity.CENTER);placeholder.setTextColor(ACCENT);poster.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));ImageView image=new ImageView(this);image.setScaleType(ImageView.ScaleType.CENTER_CROP);image.setImageResource("斑马百科".equals(title)?R.drawable.kid_zebra:R.drawable.kid_placeholder);poster.addView(image,new FrameLayout.LayoutParams(-1,-1));
-  card.addView(poster,new LinearLayout.LayoutParams(dp(148),dp(210)));TextView name=label(title,16);name.setSingleLine(true);name.setEllipsize(android.text.TextUtils.TruncateAt.END);card.addView(name,new LinearLayout.LayoutParams(dp(148),dp(46)));card.addView(label(rate.isEmpty()?"查看动画":"★ "+rate,13));card.setTag(image);
+  int cardWidth=Math.min(200,Math.max(148,(int)(getResources().getDisplayMetrics().widthPixels/getResources().getDisplayMetrics().density-120)/5));int cardHeight=(int)(cardWidth*210f/148f);card.addView(poster,new LinearLayout.LayoutParams(dp(cardWidth),dp(cardHeight)));TextView name=label(title,16);name.setSingleLine(true);name.setEllipsize(android.text.TextUtils.TruncateAt.END);card.addView(name,new LinearLayout.LayoutParams(dp(cardWidth),dp(46)));card.addView(label(rate.isEmpty()?"查看动画":"★ "+rate,13));card.setTag(image);
   card.setOnClickListener(v->action.run());card.setOnFocusChangeListener((v,focused)->{card.setBackgroundColor(focused?Color.rgb(73,100,63):Color.TRANSPARENT);card.setScaleX(focused?1.04f:1f);card.setScaleY(focused?1.04f:1f);});return card;
  }
  private android.graphics.Bitmap sourceBitmap(String address)throws IOException{
@@ -68,7 +68,7 @@ public final class MainActivity extends Activity {
    if(!UrlPolicy.accept(address))throw new IOException("海报地址无效");URL url=new URL(address);if(!publicHost(url.getHost()))throw new IOException("海报地址不可用");
    HttpURLConnection c=(HttpURLConnection)url.openConnection();c.setInstanceFollowRedirects(false);c.setConnectTimeout(5000);c.setReadTimeout(5000);c.setRequestProperty("User-Agent","Mozilla/5.0 WatchTV");
    try{int code=c.getResponseCode();if(code>=300&&code<400&&c.getHeaderField("Location")!=null){address=new URL(url,c.getHeaderField("Location")).toString();continue;}if(code!=200)throw new IOException("海报不可用");
-    try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] buf=new byte[8192];int n,size=0;while((n=in.read(buf))!=-1){size+=n;if(size>2*1024*1024)throw new IOException("海报过大");out.write(buf,0,n);}byte[] bytes=out.toByteArray();BitmapFactory.Options opts=new BitmapFactory.Options();opts.inSampleSize=4;return BitmapFactory.decodeByteArray(bytes,0,bytes.length,opts);}
+    try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] buf=new byte[8192];int n,size=0;while((n=in.read(buf))!=-1){size+=n;if(size>2*1024*1024)throw new IOException("海报过大");out.write(buf,0,n);}byte[] bytes=out.toByteArray();BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(bytes,0,bytes.length,bounds);if(bounds.outWidth<=0||bounds.outHeight<=0||bounds.outWidth>8192||bounds.outHeight>8192)throw new IOException("海报尺寸无效");BitmapFactory.Options opts=new BitmapFactory.Options();opts.inSampleSize=1;while(bounds.outWidth/(opts.inSampleSize*2)>=300&&bounds.outHeight/(opts.inSampleSize*2)>=400)opts.inSampleSize*=2;return BitmapFactory.decodeByteArray(bytes,0,bytes.length,opts);}
    }finally{c.disconnect();}
   }throw new IOException("海报重定向过多");
  }
